@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WIRE — Live News</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #111;
+    --border: #1e1e1e;
+    --muted: #484848;
+    --text: #bbb;
+    --bright: #f0f0f0;
+
+    --bbc-color: #f5b8b8;
+    --bbc-accent: #dd3333;
+    --aj-color: #a3c4e8;
+    --aj-accent: #4c8ec9;
+    --npr-color: #b8e6b0;
+    --npr-accent: #5cad50;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 20px;
+  }
+
+  .container { width: 100%; max-width: 1200px; }
+
+  /* ── MASTHEAD ── */
+  .masthead {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 14px;
+  }
+  .masthead h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3rem;
+    letter-spacing: 6px;
+    color: var(--bright);
+    line-height: 1;
+  }
+  .live-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: #d44;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .live-dot::before {
+    content: '';
+    width: 7px; height: 7px;
+    background: #d44;
+    border-radius: 50%;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:0.35; transform:scale(0.75); }
+  }
+  .clock {
+    margin-left: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* ── TICKER ── */
+  .ticker-wrapper {
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+    position: relative;
+    height: 50px;
+    margin-bottom: 16px;
+  }
+  .ticker-wrapper::before,
+  .ticker-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 80px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .ticker-wrapper::before { left:0;  background: linear-gradient(to right, var(--bg), transparent); }
+  .ticker-wrapper::after  { right:0; background: linear-gradient(to left,  var(--bg), transparent); }
+
+  .ticker-track {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    white-space: nowrap;
+    will-change: transform;
+  }
+  .ticker-track.scrolling { animation: tickerScroll linear infinite; }
+  .ticker-track:hover { animation-play-state: paused; }
+  @keyframes tickerScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  .ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 32px;
+    height: 100%;
+    border-right: 1px solid var(--border);
+  }
+  .source-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 2px 5px;
+    border: 1px solid;
+    flex-shrink: 0;
+    line-height: 1.6;
+  }
+  .source-badge.bbc { color:var(--bbc-accent); border-color:var(--bbc-accent); }
+  .source-badge.aj  { color:var(--aj-accent);  border-color:var(--aj-accent); }
+  .source-badge.npr { color:var(--npr-accent); border-color:var(--npr-accent); }
+  .ticker-headline { font-size: 0.85rem; color: var(--text); }
+  .ticker-loading {
+    padding: 0 40px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.74rem;
+    color: var(--muted);
+  }
+
+  /* ── PANELS ── */
+  .panels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+  .feed-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  .feed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .feed-title-group { display:flex; align-items:center; gap:8px; }
+  .feed-accentbar {
+    height: 2px; width: 24px;
+    border-radius: 1px; flex-shrink: 0;
+  }
+  .feed-accentbar.bbc { background: var(--bbc-accent); }
+  .feed-accentbar.aj  { background: var(--aj-accent); }
+  .feed-accentbar.npr { background: var(--npr-accent); }
+
+  .feed-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 3px;
+  }
+  .feed-title.bbc { color: var(--bbc-color); }
+  .feed-title.aj  { color: var(--aj-color); }
+  .feed-title.npr { color: var(--npr-color); }
+
+  .feed-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .feed-items { overflow-y: auto; max-height: 380px; }
+  .feed-items::-webkit-scrollbar { width: 2px; }
+  .feed-items::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .feed-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.035);
+    transition: background 0.12s;
+  }
+  .feed-item:hover { background: rgba(255,255,255,0.025); }
+  .feed-item:last-child { border-bottom: none; }
+  .item-time {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-bottom: 3px;
+  }
+  .item-headline { font-size: 0.79rem; line-height: 1.48; color: var(--text); }
+  .item-headline a { color: inherit; text-decoration: none; }
+  .item-headline a:hover { color: var(--bright); text-decoration: underline; }
+
+  /* ── STATUS BAR ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+    flex-wrap: wrap;
+  }
+  .sep { color: #2a2a2a; }
+  .s-ok      { color: #5c9; }
+  .s-err     { color: #d55; }
+  .s-loading { color: #777; }
+
+  .refresh-btn {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .refresh-btn:hover:not(:disabled) { border-color: #555; color: var(--bright); }
+  .refresh-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ── SKELETON ── */
+  .skeleton {
+    background: linear-gradient(90deg, var(--border) 25%, #1e1e1e 50%, var(--border) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 2px;
+    height: 10px;
+    margin-bottom: 5px;
+  }
+  .skeleton.w80 { width: 80%; }
+  .skeleton.w45 { width: 45%; }
+  @keyframes shimmer {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
+  }
+  .no-news {
+    padding: 28px 14px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    text-align: center;
+    line-height: 1.7;
+  }
+
+  @media (max-width: 780px) {
+    .panels { grid-template-columns: 1fr; }
+    .masthead h1 { font-size: 2.2rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="masthead">
+    <h1>WIRE</h1>
+    <span class="live-dot">Live</span>
+    <span class="clock" id="clock">--:--:--</span>
+  </div>
+
+  <div class="ticker-wrapper">
+    <div class="ticker-track" id="tickerTrack">
+      <span class="ticker-loading">Connecting to feeds…</span>
+    </div>
+  </div>
+
+  <div class="panels">
+    <!-- BBC -->
+    <div class="feed-panel">
+      <div class="feed-header">
+        <div class="feed-title-group">
+          <div class="feed-accentbar bbc"></div>
+          <span class="feed-title bbc">BBC World</span>
+        </div>
+        <span class="feed-count" id="bbcCount">—</span>
+      </div>
+      <div class="feed-items" id="bbcFeed">
+        <div class="feed-item"><div class="skeleton w80"></div><div class="skeleton w45"></div></div>
+        <div class="feed-item"><div class="skeleton w80"></div><div class="skeleton w45"></div></div>
+        <div class="feed-item"><div class="skeleton w80"></div><div class="skeleton w45"></div></div>
+      </div>
+    </div>
+
+    <!-- Al Jazeera -->
+    <div class="feed-panel">
+      <div class="feed-header">
+        <div class="feed-title-group">
+          <div class="feed-accentbar aj"></div>
+          <span class="feed-title aj">Al Jazeera</span>
+        </div>
+        <span class="feed-count" id="ajCount">—</span>
+      </div>
+      <div class="feed-items" id="ajFeed">
+        <div class="feed-item"><div class="skeleton w80"></div><div class="skeleton w45"></div></div>
+        <div class="feed-item"><div class="skeleton w80"></div><div class="skeleton w45"></div></div>
+        <div class="feed-item"><div class="skeleton w80"></div><div class="skeleton w45"></div></div>
+      </div>
+    </div>
+
+    <!-- NPR -->
+    <div class="feed-panel">
+      <div class="feed-header">
+        <div class="feed-title-group">
+          <div class="feed-accentbar npr"></div>
+          <span class="feed-title npr">NPR News</span>
+        </div>
+        <span class="feed-count" id="nprCount">—</span>
+      </div>
+      <div class="feed-items" id="nprFeed">
+        <div class="feed-item"><div class="skeleton w80"></div><div class="skeleton w45"></div></div>
+        <div class="feed-item"><div class="skeleton w80"></div><div class="skeleton w45"></div></div>
+        <div class="feed-item"><div class="skeleton w80"></div><div class="skeleton w45"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span id="sBBC" class="s-loading">BBC: —</span>
+    <span class="sep">|</span>
+    <span id="sAJ"  class="s-loading">Al Jazeera: —</span>
+    <span class="sep">|</span>
+    <span id="sNPR" class="s-loading">NPR: —</span>
+    <span id="sTime"></span>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadAll()">↻ REFRESH</button>
+  </div>
+
+</div>
+<script>
+// ── Clock ──────────────────────────────────────────────────────────
+(function tick() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-US', { hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  setTimeout(tick, 1000);
+})();
+
+// ── CORS proxies ───────────────────────────────────────────────────
+const PROXIES = [
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+// ── Feed definitions ───────────────────────────────────────────────
+// BBC has had active RSS at feeds.bbci.co.uk since forever — very reliable.
+const FEEDS = {
+  bbc: {
+    urls: [
+      'https://feeds.bbci.co.uk/news/world/rss.xml',
+      'https://feeds.bbci.co.uk/news/rss.xml',
+    ]
+  },
+  aj: {
+    urls: [
+      'https://www.aljazeera.com/xml/rss/all.xml',
+    ]
+  },
+  npr: {
+    urls: [
+      'https://feeds.npr.org/1001/rss.xml',
+      'https://feeds.npr.org/1004/rss.xml',
+    ]
+  },
+};
+
+// ── Generic RSS fetcher with proxy fallback ────────────────────────
+async function fetchRSS(feedDef) {
+  for (const feedUrl of feedDef.urls) {
+    for (const makeProxy of PROXIES) {
+      try {
+        const res = await fetch(makeProxy(feedUrl), {
+          signal: AbortSignal.timeout(10000)
+        });
+        if (!res.ok) continue;
+        const text = await res.text();
+        if (!text.includes('<item') && !text.includes('<entry')) continue;
+
+        const doc = new DOMParser().parseFromString(text, 'text/xml');
+        const items = [...doc.querySelectorAll('item, entry')].slice(0, 20);
+        if (!items.length) continue;
+
+        return items.map(el => ({
+          title:   (el.querySelector('title')?.textContent || '').trim(),
+          link:    (el.querySelector('link')?.textContent?.trim() || el.querySelector('link')?.getAttribute('href') || '').trim(),
+          pubDate: (el.querySelector('pubDate, published, updated')?.textContent || '').trim(),
+        })).filter(i => i.title);
+
+      } catch (e) {
+        // try next proxy / URL
+      }
+    }
+  }
+  return null;
+}
+
+// ── Render helpers ─────────────────────────────────────────────────
+function fmtTime(s) {
+  if (!s) return '';
+  try {
+    const d = new Date(s);
+    return isNaN(d) ? '' : d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false });
+  } catch { return ''; }
+}
+
+function renderPanel(feedId, countId, items) {
+  document.getElementById(countId).textContent = items ? `${items.length} items` : '0 items';
+  document.getElementById(feedId).innerHTML = (items && items.length)
+    ? items.map(i => `
+        <div class="feed-item">
+          ${i.pubDate ? `<div class="item-time">${fmtTime(i.pubDate)}</div>` : ''}
+          <div class="item-headline">
+            ${i.link
+              ? `<a href="${i.link}" target="_blank" rel="noopener noreferrer">${i.title}</a>`
+              : i.title}
+          </div>
+        </div>`).join('')
+    : `<div class="no-news">Feed unavailable.<br>Check the status bar below.</div>`;
+}
+
+// ── State + ticker ─────────────────────────────────────────────────
+let state = { bbc: [], aj: [], npr: [] };
+
+function buildTicker() {
+  const max = Math.max(state.bbc.length, state.aj.length, state.npr.length);
+  if (!max) return;
+  const combined = [];
+  for (let i = 0; i < max; i++) {
+    if (i < state.bbc.length) combined.push({ cls:'bbc', label:'BBC', ...state.bbc[i] });
+    if (i < state.aj.length)  combined.push({ cls:'aj',  label:'AJ',  ...state.aj[i] });
+    if (i < state.npr.length) combined.push({ cls:'npr', label:'NPR', ...state.npr[i] });
+  }
+
+  const makeItems = () => combined.map(h => `
+    <div class="ticker-item">
+      <span class="source-badge ${h.cls}">${h.label}</span>
+      <span class="ticker-headline">${h.title}</span>
+    </div>`).join('');
+
+  const track = document.getElementById('tickerTrack');
+  track.innerHTML = makeItems() + makeItems();
+  track.classList.add('scrolling');
+  const dur = Math.max(60, Math.min(250, combined.length * 12));
+  track.style.animationDuration = `${dur}s`;
+}
+
+// ── Status ─────────────────────────────────────────────────────────
+function setStatus(id, text, cls) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = cls;
+}
+
+// ── Load all ───────────────────────────────────────────────────────
+async function loadAll() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  setStatus('sBBC', 'BBC: fetching…',        's-loading');
+  setStatus('sAJ',  'Al Jazeera: fetching…', 's-loading');
+  setStatus('sNPR', 'NPR: fetching…',        's-loading');
+
+  const [bbcRes, ajRes, nprRes] = await Promise.allSettled([
+    fetchRSS(FEEDS.bbc),
+    fetchRSS(FEEDS.aj),
+    fetchRSS(FEEDS.npr),
+  ]);
+
+  const handle = (result, key, panelId, countId, statusId, label) => {
+    if (result.status === 'fulfilled' && result.value?.length) {
+      state[key] = result.value;
+      renderPanel(panelId, countId, state[key]);
+      setStatus(statusId, `${label}: ● ${state[key].length}`, 's-ok');
+    } else {
+      console.error(`${label} feed error:`, result.reason);
+      state[key] = [];
+      renderPanel(panelId, countId, null);
+      setStatus(statusId, `${label}: ✕ failed`, 's-err');
+    }
+  };
+
+  handle(bbcRes, 'bbc', 'bbcFeed', 'bbcCount', 'sBBC', 'BBC');
+  handle(ajRes,  'aj',  'ajFeed',  'ajCount',  'sAJ',  'Al Jazeera');
+  handle(nprRes, 'npr', 'nprFeed', 'nprCount', 'sNPR', 'NPR');
+
+  buildTicker();
+  document.getElementById('sTime').textContent = `· Updated ${new Date().toLocaleTimeString()}`;
+  btn.disabled = false;
+}
+
+// Boot + auto-refresh every 5 min
+loadAll();
+setInterval(loadAll, 5 * 60 * 1000);
+</script>
+</body>
+</html>
